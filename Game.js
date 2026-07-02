@@ -21,11 +21,14 @@ class Game {
     this.currentLevel = null;
     this.currentMode = 'learn';
     this.currentDiffKey = 'easy';
+    this.gameType = 'challenge'; // 'challenge' or 'rank'
     this.score = 0;
     this.timer = 0;
     this.lives = 1;
     this.correctCount = 0;
     this.totalAttempted = 0;
+    this.streak = 0;
+    this.maxStreak = 0;
     this.equationQueue = [];
     this.eqDisplay = null;
     this.playerUsername = null;
@@ -63,7 +66,8 @@ class Game {
     }
 
     document.getElementById('loadingText').style.display = 'none';
-    document.getElementById('btnStart').style.display = 'inline-block';
+    document.getElementById('btnRankMode').style.display = 'inline-block';
+    document.getElementById('btnChallenge').style.display = 'inline-block';
     document.getElementById('btnLeaderboard').style.display = 'inline-block';
     document.getElementById('mainMenuAudioRow').style.display = 'block';
 
@@ -85,7 +89,12 @@ class Game {
 
   setupUI() {
     // Main menu
-    document.getElementById('btnStart').addEventListener('click', () => {
+    document.getElementById('btnRankMode').addEventListener('click', () => {
+      document.getElementById('mainMenu').style.display = 'none';
+      this.startRankMode();
+    });
+
+    document.getElementById('btnChallenge').addEventListener('click', () => {
       document.getElementById('mainMenu').style.display = 'none';
       this.showDifficultySelect();
     });
@@ -146,6 +155,23 @@ class Game {
       this.showLeaderboard();
     });
 
+    // Rank Mode game over
+    document.getElementById('btnRankRetry').addEventListener('click', () => {
+      document.getElementById('rankGameOver').style.display = 'none';
+      document.getElementById('rankHud').style.display = 'none';
+      this.startRankMode();
+    });
+
+    document.getElementById('btnRankMap').addEventListener('click', () => {
+      document.getElementById('rankGameOver').style.display = 'none';
+      document.getElementById('rankHud').style.display = 'none';
+      document.getElementById('mainMenu').style.display = 'flex';
+    });
+
+    document.getElementById('btnRankLeaderboard').addEventListener('click', () => {
+      this.showLeaderboard('rank');
+    });
+
     // Leaderboard close
     document.getElementById('btnLbClose').addEventListener('click', () => {
       document.getElementById('leaderboardModal').style.display = 'none';
@@ -163,15 +189,6 @@ class Game {
 
     document.getElementById('btnUsernameSkip').addEventListener('click', () => {
       this.closeUsernameModal();
-    });
-
-    // Leaderboard tab switching
-    document.querySelectorAll('.lb-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        this.refreshLeaderboard(tab.dataset.tab);
-      });
     });
 
     // Audio toggles
@@ -236,6 +253,41 @@ class Game {
     } catch (e) {
       error.textContent = 'Error: ' + e.message;
     }
+  }
+
+  // ───────────── Rank Mode ─────────────
+
+  startRankMode() {
+    this.gameType = 'rank';
+    this.currentMode = 'time';
+    this.currentDiffKey = 'super_hard';
+    this.score = 0;
+    this.streak = 0;
+    this.maxStreak = 0;
+    this.correctCount = 0;
+    this.totalAttempted = 0;
+    this.timer = 60; // 60 seconds
+    this.scoreMultiplier = 1;
+
+    // Get all super_hard equations
+    const superHardEqs = LevelData_equations
+      .filter(eq => eq.diff === 'super_hard')
+      .map(eq => eq.id);
+    this.equationQueue = [...superHardEqs];
+
+    if (this.eqDisplay) {
+      this.eqDisplay.cleanup();
+      this.eqDisplay.destroy = true;
+      this.eqDisplay = null;
+    }
+
+    document.getElementById('rankHud').style.display = 'flex';
+    document.getElementById('rankHudScore').textContent = 'Score: 0';
+    document.getElementById('rankHudStreak').textContent = 'Streak: 0';
+
+    this.setupTray();
+    this.nextEquation();
+    this.state = 'PLAYING';
   }
 
   // ───────────── Difficulty / Mode Selection ─────────────
@@ -311,6 +363,7 @@ class Game {
 
       btn.addEventListener('click', () => {
         document.getElementById('modeSelect').style.display = 'none';
+        this.gameType = 'challenge';
         this.startLevel(level);
       });
 
@@ -321,12 +374,15 @@ class Game {
   // ───────────── Level Start ─────────────
 
   startLevel(levelData) {
+    this.gameType = 'challenge';
     this.currentLevel = levelData;
     this.currentMode = levelData.mode;
     this.currentDiffKey = levelData.diffKey;
     this.scoreMultiplier = levelData.scoreMultiplier;
     this.equationQueue = [...levelData.eqs];
     this.score = 0;
+    this.streak = 0;
+    this.maxStreak = 0;
     this.correctCount = 0;
     this.totalAttempted = 0;
     this.timer = levelData.time || 0;
@@ -375,6 +431,12 @@ class Game {
     if (this.equationQueue.length === 0) {
       if (this.currentMode === 'endless') {
         this.equationQueue = [...this.currentLevel.eqs].sort(() => Math.random() - 0.5);
+      } else if (this.gameType === 'rank') {
+        // Refill with random equations for rank mode
+        const superHardEqs = LevelData_equations
+          .filter(eq => eq.diff === 'super_hard')
+          .map(eq => eq.id);
+        this.equationQueue = [...superHardEqs].sort(() => Math.random() - 0.5);
       } else {
         this.endGame(true);
         return;
@@ -518,9 +580,19 @@ class Game {
 
     if (allCorrect) {
       this.correctCount++;
-      // Apply score multiplier
-      this.score += Math.floor(100 * this.scoreMultiplier);
-      document.getElementById('hudScore').textContent = `Score: ${this.score}`;
+      this.streak++;
+      if (this.streak > this.maxStreak) this.maxStreak = this.streak;
+
+      // Rank mode scoring: 100 base + 10 per streak
+      if (this.gameType === 'rank') {
+        this.score += 100 + (this.streak - 1) * 10;
+        document.getElementById('rankHudScore').textContent = `Score: ${this.score}`;
+        document.getElementById('rankHudStreak').textContent = `Streak: ${this.streak}`;
+      } else {
+        // Challenge mode: apply multiplier
+        this.score += Math.floor(100 * this.scoreMultiplier);
+        document.getElementById('hudScore').textContent = `Score: ${this.score}`;
+      }
 
       if (this.bgGrid) this.bgGrid.triggerClear();
       this.spawnParticles(this.designWidth / 2, this.designHeight / 2, '#7bed9f');
@@ -533,6 +605,11 @@ class Game {
       }, 800);
 
     } else {
+      this.streak = 0; // Reset streak on wrong answer
+      if (this.gameType === 'rank') {
+        document.getElementById('rankHudStreak').textContent = `Streak: 0`;
+      }
+
       this.cam.shake(5, 0.5);
       Audio.playWrong();
 
@@ -565,54 +642,103 @@ class Game {
 
   async endGame(win) {
     this.state = 'GAMEOVER';
-    document.getElementById('hud').style.display = 'none';
-    document.getElementById('gameOver').style.display = 'flex';
 
-    const title = document.getElementById('gameOverTitle');
-    const stats = document.getElementById('gameOverStats');
-    const personal = document.getElementById('gameOverPersonal');
+    if (this.gameType === 'rank') {
+      // Rank mode game over
+      document.getElementById('rankHud').style.display = 'none';
+      document.getElementById('rankGameOver').style.display = 'flex';
 
-    let statsText = `Score: ${this.score} | Correct: ${this.correctCount}/${this.totalAttempted}`;
-    if (this.currentMode === 'time' && this.timer > 0) {
-      statsText += ` | Time left: ${Math.ceil(this.timer)}s`;
-    }
+      const title = document.getElementById('rankGameOverTitle');
+      const stats = document.getElementById('rankGameOverStats');
+      const rankDisplay = document.getElementById('rankGameOverRank');
+      const personal = document.getElementById('rankGameOverPersonal');
 
-    if (win) {
-      title.textContent = '🎉 Level Complete!';
+      const accuracy = this.totalAttempted > 0 ? Math.round((this.correctCount / this.totalAttempted) * 100) : 0;
+      const statsText = `Final Score: ${this.score} | Correct: ${this.correctCount}/${this.totalAttempted} (${accuracy}%) | Longest Streak: ${this.maxStreak}`;
       stats.textContent = statsText;
-      document.getElementById('btnNextLevel').style.display = 'inline-block';
+
+      title.textContent = '💎 Rank Mode Complete!';
       Audio.playLevelComplete();
-    } else {
-      title.textContent = '💀 Game Over!';
-      stats.textContent = statsText;
-      document.getElementById('btnNextLevel').style.display = 'none';
-      Audio.playGameOver();
-    }
 
-    // Save score
-    personal.textContent = '';
-    if (this.playerUsername && this.currentLevel && this.score > 0) {
-      try {
-        const isPB = await SupabaseClient.isNewPersonalBest(this.score, this.currentMode);
-        await SupabaseClient.saveScore({
-          score: this.score,
-          correctCount: this.correctCount,
-          totalAttempted: this.totalAttempted,
-          levelId: this.currentLevel.id,
-          mode: this.currentMode
-        });
-        if (isPB) {
-          personal.textContent = '🏆 New personal best!';
+      // Save rank mode score
+      personal.textContent = '';
+      rankDisplay.textContent = '';
+
+      if (this.playerUsername && this.score > 0) {
+        try {
+          await SupabaseClient.saveScore({
+            score: this.score,
+            correctCount: this.correctCount,
+            totalAttempted: this.totalAttempted,
+            levelId: 999, // Rank mode ID
+            mode: 'rank',
+            streak: this.maxStreak
+          });
+
+          // Get player rank
+          const rank = await SupabaseClient.getPlayerRankMode(this.playerUsername);
+          if (rank.playerRank !== null) {
+            const totalPlayers = await SupabaseClient.getTotalPlayersRankMode();
+            rankDisplay.textContent = `🏅 Rank #${rank.playerRank} out of ${totalPlayers} players`;
+          }
+
+          personal.textContent = '✅ Score saved!';
+        } catch (e) {
+          console.warn('Failed to save rank mode score:', e.message);
+          personal.textContent = 'Error saving score';
         }
-      } catch (e) {
-        console.warn('Failed to save score:', e.message);
+      }
+    } else {
+      // Challenge mode game over
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('gameOver').style.display = 'flex';
+
+      const title = document.getElementById('gameOverTitle');
+      const stats = document.getElementById('gameOverStats');
+      const personal = document.getElementById('gameOverPersonal');
+
+      let statsText = `Score: ${this.score} | Correct: ${this.correctCount}/${this.totalAttempted}`;
+      if (this.currentMode === 'time' && this.timer > 0) {
+        statsText += ` | Time left: ${Math.ceil(this.timer)}s`;
+      }
+
+      if (win) {
+        title.textContent = '🎉 Level Complete!';
+        stats.textContent = statsText;
+        document.getElementById('btnNextLevel').style.display = 'inline-block';
+        Audio.playLevelComplete();
+      } else {
+        title.textContent = '💀 Game Over!';
+        stats.textContent = statsText;
+        document.getElementById('btnNextLevel').style.display = 'none';
+        Audio.playGameOver();
+      }
+
+      // Save challenge mode score
+      personal.textContent = '';
+      if (this.playerUsername && this.currentLevel && this.score > 0) {
+        try {
+          const isPB = await SupabaseClient.isNewPersonalBest(this.score, this.currentMode);
+          await SupabaseClient.saveScore({
+            score: this.score,
+            correctCount: this.correctCount,
+            totalAttempted: this.totalAttempted,
+            levelId: this.currentLevel.id,
+            mode: this.currentMode
+          });
+          if (isPB) {
+            personal.textContent = '🏆 New personal best!';
+          }
+        } catch (e) {
+          console.warn('Failed to save score:', e.message);
+        }
       }
     }
   }
 
   // ───────────── Leaderboard ─────────────
 
-  async showLeaderboard() {
+  async showLeaderboard(mode = 'challenge') {
     const modal = document.getElementById('leaderboardModal');
     const list = document.getElementById('lbList');
     const nameEl = document.getElementById('lbName');
@@ -624,11 +750,22 @@ class Game {
     if (this.playerUsername) {
       nameEl.textContent = this.playerUsername;
       try {
-        const rank = await SupabaseClient.getPlayerRank(this.playerUsername);
-        if (rank.scoreRank !== null) {
-          rankEl.textContent = `#${rank.scoreRank} by score, #${rank.correctRank} by correct`;
+        if (mode === 'rank') {
+          // Get rank mode rank
+          const rank = await SupabaseClient.getPlayerRankMode(this.playerUsername);
+          const total = await SupabaseClient.getTotalPlayersRankMode();
+          if (rank.playerRank !== null) {
+            rankEl.textContent = `#${rank.playerRank} out of ${total} players`;
+          } else {
+            rankEl.textContent = 'No rank mode scores yet — play to compete!';
+          }
         } else {
-          rankEl.textContent = 'No scores yet — play a game!';
+          const rank = await SupabaseClient.getPlayerRank(this.playerUsername);
+          if (rank.scoreRank !== null) {
+            rankEl.textContent = `#${rank.scoreRank} by score, #${rank.correctRank} by correct`;
+          } else {
+            rankEl.textContent = 'No scores yet — play a game!';
+          }
         }
       } catch (e) {
         rankEl.textContent = 'Could not load rank';
@@ -638,9 +775,11 @@ class Game {
       rankEl.textContent = 'Log in to see your rank';
     }
 
-    document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
-    document.querySelector('.lb-tab[data-tab="score"]').classList.add('active');
-    await this.refreshLeaderboard('score');
+    if (mode === 'rank') {
+      await this.refreshLeaderboardRank();
+    } else {
+      await this.refreshLeaderboard('score');
+    }
   }
 
   async refreshLeaderboard(tab) {
@@ -704,6 +843,54 @@ class Game {
     }
   }
 
+  async refreshLeaderboardRank() {
+    const list = document.getElementById('lbList');
+    list.innerHTML = '<div class="lb-loading">Loading...</div>';
+
+    try {
+      const entries = await SupabaseClient.getLeaderboardRank(8);
+
+      if (!entries || entries.length === 0) {
+        list.innerHTML = '<div class="lb-empty">No rank mode scores yet. Be the first!</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      const username = (this.playerUsername || '').toLowerCase();
+
+      for (const entry of entries) {
+        const div = document.createElement('div');
+        div.className = 'lb-entry';
+        if (entry.username.toLowerCase() === username) {
+          div.classList.add('me');
+        }
+
+        const rankNum = document.createElement('span');
+        rankNum.className = 'rank-num';
+        rankNum.textContent = `#${entry.rank}`;
+        div.appendChild(rankNum);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'lb-username';
+        nameSpan.textContent = entry.username;
+        div.appendChild(nameSpan);
+
+        const scoreSpan = document.createElement('span');
+        scoreSpan.className = 'lb-score';
+        scoreSpan.textContent = String(entry.score);
+        const extra = document.createElement('span');
+        extra.className = 'lb-extra';
+        extra.textContent = `Streak: ${entry.streak || 0}`;
+        scoreSpan.appendChild(extra);
+        div.appendChild(scoreSpan);
+
+        list.appendChild(div);
+      }
+    } catch (e) {
+      list.innerHTML = `<div class="lb-empty">Error loading leaderboard: ${e.message}</div>`;
+    }
+  }
+
   // ───────────── Resize ─────────────
 
   setupResize() {
@@ -719,7 +906,14 @@ class Game {
 
   update(dt) {
     if (this.state === 'PLAYING') {
-      if (this.currentMode === 'time') {
+      if (this.gameType === 'rank') {
+        this.timer -= dt;
+        if (this.timer <= 0) {
+          this.timer = 0;
+          this.endGame(false);
+        }
+        document.getElementById('rankHudTimer').textContent = `${Math.ceil(this.timer)}s`;
+      } else if (this.currentMode === 'time') {
         this.timer -= dt;
         if (this.timer <= 0) {
           this.timer = 0;
