@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS public.scores (
   total_attempted INTEGER NOT NULL DEFAULT 0,
   level_id INTEGER NOT NULL DEFAULT 0,
   mode TEXT NOT NULL DEFAULT 'learn',
+  streak INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS public.scores (
 CREATE INDEX IF NOT EXISTS idx_scores_score ON public.scores(score DESC);
 CREATE INDEX IF NOT EXISTS idx_scores_correct ON public.scores(correct_count DESC);
 CREATE INDEX IF NOT EXISTS idx_scores_created ON public.scores(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_scores_mode ON public.scores(mode);
 
 -- Enable Row Level Security (optional, public read / authenticated insert)
 ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
@@ -161,7 +163,8 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
       correct_count: scoreData.correctCount || 0,
       total_attempted: scoreData.totalAttempted || 0,
       level_id: scoreData.levelId || 0,
-      mode: scoreData.mode || 'learn'
+      mode: scoreData.mode || 'learn',
+      streak: scoreData.streak || 0
     };
 
     if (this._useLocalFallback) {
@@ -177,7 +180,7 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
   /** Get leaderboard — top 10 by score (for time/learn mode) */
   async getLeaderboardByScore(limit = 10) {
     if (this._useLocalFallback) {
-      const scores = this._localData.scores;
+      const scores = this._localData.scores.filter(s => s.mode !== 'rank');
       const grouped = {};
       for (const s of scores) {
         const key = s.username;
@@ -191,7 +194,7 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
         .map((s, i) => ({ rank: i + 1, ...s }));
     }
 
-    // Get best score per player
+    // Get best score per player (non-rank mode)
     const { data, error } = await this._client
       .rpc('get_leaderboard_by_score', { limit_count: limit });
 
@@ -200,6 +203,7 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
       const { data: raw } = await this._client
         .from('scores')
         .select('username, score, correct_count, mode, level_id, created_at')
+        .neq('mode', 'rank')
         .order('score', { ascending: false })
         .limit(50);
 
@@ -224,7 +228,7 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
   /** Get leaderboard — top 10 by correct count */
   async getLeaderboardByCorrect(limit = 10) {
     if (this._useLocalFallback) {
-      const scores = this._localData.scores;
+      const scores = this._localData.scores.filter(s => s.mode !== 'rank');
       const grouped = {};
       for (const s of scores) {
         const key = s.username;
@@ -245,6 +249,7 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
       const { data: raw } = await this._client
         .from('scores')
         .select('username, score, correct_count, mode, level_id, created_at')
+        .neq('mode', 'rank')
         .order('correct_count', { ascending: false })
         .limit(50);
 
@@ -265,58 +270,5 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
     return (data || []).map((s, i) => ({ rank: i + 1, ...s }));
   },
 
-  /** Get player's own best score and rank */
-  async getPlayerRank(username) {
-    const byScore = await this.getLeaderboardByScore(100);
-    const byCorrect = await this.getLeaderboardByCorrect(100);
-
-    const scoreRank = byScore.findIndex(s => s.username.toLowerCase() === username.toLowerCase());
-    const correctRank = byCorrect.findIndex(s => s.username.toLowerCase() === username.toLowerCase());
-
-    return {
-      score: scoreRank >= 0 ? byScore[scoreRank] : null,
-      scoreRank: scoreRank >= 0 ? scoreRank + 1 : null,
-      correct: correctRank >= 0 ? byCorrect[correctRank] : null,
-      correctRank: correctRank >= 0 ? correctRank + 1 : null
-    };
-  },
-
-  /** Check if current player has a new personal best */
-  async isNewPersonalBest(score, mode) {
-    if (!this._currentPlayer) return true;
-    if (this._useLocalFallback) {
-      const playerScores = this._localData.scores.filter(
-        s => s.player_id === this._currentPlayer.id && s.mode === mode
-      );
-      if (playerScores.length === 0) return true;
-      const best = Math.max(...playerScores.map(s => s.score));
-      return score > best;
-    }
-
-    const { data } = await this._client
-      .from('scores')
-      .select('score')
-      .eq('player_id', this._currentPlayer.id)
-      .eq('mode', mode)
-      .order('score', { ascending: false })
-      .limit(1);
-
-    if (!data || data.length === 0) return true;
-    return score > data[0].score;
-  },
-
-  // ---- LocalStorage fallback ----
-  _loadLocal() {
-    try {
-      const raw = localStorage.getItem('chemblast_data');
-      if (raw) return JSON.parse(raw);
-    } catch (e) { /* ignore */ }
-    return { players: [], scores: [] };
-  },
-
-  _saveLocal() {
-    try {
-      localStorage.setItem('chemblast_data', JSON.stringify(this._localData));
-    } catch (e) { /* ignore */ }
-  }
-};
+  /** Get Rank Mode leaderboard — Top 8 by score */
+  async getLeaderboardRank(limit = 8) {\n    if (this._useLocalFallback) {\n      const scores = this._localData.scores.filter(s => s.mode === 'rank');\n      const grouped = {};\n      for (const s of scores) {\n        const key = s.username;\n        if (!grouped[key] || s.score > grouped[key].score) {\n          grouped[key] = s;\n        }\n      }\n      return Object.values(grouped)\n        .sort((a, b) => b.score - a.score)\n        .slice(0, limit)\n        .map((s, i) => ({ rank: i + 1, ...s }));\n    }\n\n    const { data, error } = await this._client\n      .rpc('get_leaderboard_rank_mode', { limit_count: limit });\n\n    if (error) {\n      // Fallback: raw query\n      const { data: raw } = await this._client\n        .from('scores')\n        .select('username, score, streak, correct_count, created_at')\n        .eq('mode', 'rank')\n        .order('score', { ascending: false })\n        .limit(50);\n\n      if (!raw) return [];\n\n      // Deduplicate: keep best score per player\n      const best = new Map();\n      for (const s of raw) {\n        if (!best.has(s.username) || s.score > best.get(s.username).score) {\n          best.set(s.username, s);\n        }\n      }\n      return Array.from(best.values())\n        .sort((a, b) => b.score - a.score)\n        .slice(0, limit)\n        .map((s, i) => ({ rank: i + 1, ...s }));\n    }\n\n    return (data || []).map((s, i) => ({ rank: i + 1, ...s }));\n  },\n\n  /** Get player's rank in Rank Mode */\n  async getPlayerRankMode(username) {\n    if (this._useLocalFallback) {\n      const rankScores = this._localData.scores.filter(s => s.mode === 'rank');\n      const grouped = {};\n      for (const s of rankScores) {\n        const key = s.username;\n        if (!grouped[key] || s.score > grouped[key].score) {\n          grouped[key] = s;\n        }\n      }\n      const sorted = Object.values(grouped).sort((a, b) => b.score - a.score);\n      const playerScore = grouped[username]?.score || -1;\n      const rank = sorted.findIndex(s => s.score === playerScore) + 1 || null;\n      return { playerRank: rank > 0 ? rank : null, totalPlayers: Object.keys(grouped).length };\n    }\n\n    const { data, error } = await this._client\n      .rpc('get_player_rank_mode', { player_username: username });\n\n    if (error || !data || data.length === 0) {\n      return { playerRank: null, totalPlayers: 0 };\n    }\n\n    return { playerRank: data[0].player_rank, totalPlayers: data[0].total_players };\n  },\n\n  /** Get total players in Rank Mode */\n  async getTotalPlayersRankMode() {\n    if (this._useLocalFallback) {\n      const rankScores = this._localData.scores.filter(s => s.mode === 'rank');\n      const uniqueUsers = new Set(rankScores.map(s => s.username));\n      return uniqueUsers.size;\n    }\n\n    try {\n      const { data } = await this._client\n        .from('scores')\n        .select('username')\n        .eq('mode', 'rank');\n\n      if (!data) return 0;\n      const unique = new Set(data.map(s => s.username));\n      return unique.size;\n    } catch (e) {\n      return 0;\n    }\n  },\n\n  /** Get player's own best score and rank */\n  async getPlayerRank(username) {\n    const byScore = await this.getLeaderboardByScore(100);\n    const byCorrect = await this.getLeaderboardByCorrect(100);\n\n    const scoreRank = byScore.findIndex(s => s.username.toLowerCase() === username.toLowerCase());\n    const correctRank = byCorrect.findIndex(s => s.username.toLowerCase() === username.toLowerCase());\n\n    return {\n      score: scoreRank >= 0 ? byScore[scoreRank] : null,\n      scoreRank: scoreRank >= 0 ? scoreRank + 1 : null,\n      correct: correctRank >= 0 ? byCorrect[correctRank] : null,\n      correctRank: correctRank >= 0 ? correctRank + 1 : null\n    };\n  },\n\n  /** Check if current player has a new personal best */\n  async isNewPersonalBest(score, mode) {\n    if (!this._currentPlayer) return true;\n    if (this._useLocalFallback) {\n      const playerScores = this._localData.scores.filter(\n        s => s.player_id === this._currentPlayer.id && s.mode === mode\n      );\n      if (playerScores.length === 0) return true;\n      const best = Math.max(...playerScores.map(s => s.score));\n      return score > best;\n    }\n\n    const { data } = await this._client\n      .from('scores')\n      .select('score')\n      .eq('player_id', this._currentPlayer.id)\n      .eq('mode', mode)\n      .order('score', { ascending: false })\n      .limit(1);\n\n    if (!data || data.length === 0) return true;\n    return score > data[0].score;\n  },\n\n  // ---- LocalStorage fallback ----\n  _loadLocal() {\n    try {\n      const raw = localStorage.getItem('chemblast_data');\n      if (raw) return JSON.parse(raw);\n    } catch (e) { /* ignore */ }\n    return { players: [], scores: [] };\n  },\n\n  _saveLocal() {\n    try {\n      localStorage.setItem('chemblast_data', JSON.stringify(this._localData));\n    } catch (e) { /* ignore */ }\n  }\n};\n
