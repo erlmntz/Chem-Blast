@@ -20,11 +20,11 @@ class AudioManager {
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = 0.15;
+      this.musicGain.gain.value = 0.25;
       this.musicGain.connect(this.ctx.destination);
 
       this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = 0.25;
+      this.sfxGain.gain.value = 0.4;
       this.sfxGain.connect(this.ctx.destination);
     } catch (e) {
       console.warn('AudioManager: Web Audio API not available', e.message);
@@ -156,7 +156,7 @@ class AudioManager {
 
   toggleMusic() {
     this.musicEnabled = !this.musicEnabled;
-    this.musicGain.gain.value = this.musicEnabled ? 0.15 : 0;
+    this.musicGain.gain.value = this.musicEnabled ? 0.25 : 0;
     return this.musicEnabled;
   }
 
@@ -203,12 +203,12 @@ class AudioManager {
 
   /** Set overall music volume (0-1) */
   setMusicVolume(v) {
-    if (this.musicGain) this.musicGain.gain.value = v * 0.15;
+    if (this.musicGain) this.musicGain.gain.value = v * 0.25;
   }
 
   /** Set SFX volume (0-1) */
   setSfxVolume(v) {
-    if (this.sfxGain) this.sfxGain.gain.value = v * 0.25;
+    if (this.sfxGain) this.sfxGain.gain.value = v * 0.4;
   }
 
   /** Cleanup */
