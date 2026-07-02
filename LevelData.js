@@ -12,7 +12,7 @@ const LevelData_equations = [
   { id: "easy_1", diff: "easy", r: [{f:"H2",c:2},{f:"O2",c:1}], p: [{f:"H2O",c:2}] },
   { id: "easy_2", diff: "easy", r: [{f:"Na",c:2},{f:"Cl2",c:1}], p: [{f:"NaCl",c:2}] },
   { id: "easy_3", diff: "easy", r: [{f:"N2",c:1},{f:"H2",c:3}], p: [{f:"NH3",c:2}] },
-  { id: "easy_4", diff: "easy", r: [{f:"Mg",c:1},{f:"O2",c:1}], p: [{f:"MgO",c:2}], note: "2 Mg + O2 → 2 MgO" },
+  { id: "easy_4", diff: "easy", r: [{f:"Mg",c:2},{f:"O2",c:1}], p: [{f:"MgO",c:2}], note: "2 Mg + O2 → 2 MgO" },
   { id: "easy_5", diff: "easy", r: [{f:"H2",c:2},{f:"Cl2",c:1}], p: [{f:"HCl",c:2}], note: "H2 + Cl2 → 2 HCl" },
   { id: "easy_6", diff: "easy", r: [{f:"C",c:1},{f:"O2",c:1}], p: [{f:"CO2",c:1}] },
 
@@ -20,7 +20,7 @@ const LevelData_equations = [
   { id: "med_1", diff: "medium", r: [{f:"CH4",c:1},{f:"O2",c:2}], p: [{f:"CO2",c:1},{f:"H2O",c:2}] },
   { id: "med_2", diff: "medium", r: [{f:"Al",c:4},{f:"O2",c:3}], p: [{f:"Al2O3",c:2}] },
   { id: "med_3", diff: "medium", r: [{f:"P4",c:1},{f:"O2",c:5}], p: [{f:"P4O10",c:1}] },
-  { id: "med_4", diff: "medium", r: [{f:"Fe",c:2},{f:"O2",c:3}], p: [{f:"Fe2O3",c:2}] },
+  { id: "med_4", diff: "medium", r: [{f:"Fe",c:4},{f:"O2",c:3}], p: [{f:"Fe2O3",c:2}] },
   { id: "med_5", diff: "medium", r: [{f:"C3H8",c:1},{f:"O2",c:5}], p: [{f:"CO2",c:3},{f:"H2O",c:4}] },
   { id: "med_6", diff: "medium", r: [{f:"Na",c:2},{f:"H2O",c:2}], p: [{f:"NaOH",c:2},{f:"H2",c:1}] },
 
