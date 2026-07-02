@@ -17,7 +17,8 @@
         <div class="panel">
           <h1>Chem Blast</h1>
           <p id="loadingText">Loading...</p>
-          <button id="btnStart" style="display: none;">Play</button>
+          <button id="btnRankMode" style="display: none;">💎 Rank Mode</button>
+          <button id="btnChallenge" style="display: none;">🎮 Challenge</button>
           <button id="btnLeaderboard" class="secondary" style="display: none;">Leaderboard</button>
           <div id="mainMenuAudioRow" style="display: none; margin-top: 12px;">
             <button id="btnToggleMusic" class="small secondary" style="font-size:14px;">🎵 Music</button>
@@ -40,7 +41,7 @@
         </div>
       </div>
 
-      <!-- Difficulty Select -->
+      <!-- Difficulty Select (Challenge Mode) -->
       <div id="difficultySelect" class="overlay" style="display: none;">
         <div class="panel">
           <h2>Choose Difficulty</h2>
@@ -49,7 +50,7 @@
         </div>
       </div>
 
-      <!-- Mode Select (after choosing difficulty) -->
+      <!-- Mode Select (after choosing difficulty in Challenge) -->
       <div id="modeSelect" class="overlay" style="display: none;">
         <div class="panel">
           <h2 id="modeSelectTitle">Select Mode</h2>
@@ -67,6 +68,16 @@
         </div>
       </div>
 
+      <!-- Rank Mode HUD (with streak) -->
+      <div id="rankHud" style="display: none;">
+        <div id="rankHudTop">
+          <span id="rankHudMode">💎 Rank Mode</span>
+          <span id="rankHudTimer">60s</span>
+          <span id="rankHudScore">Score: 0</span>
+          <span id="rankHudStreak" style="color: #ffff00;">Streak: 0</span>
+        </div>
+      </div>
+
       <!-- Game Over -->
       <div id="gameOver" class="overlay" style="display: none;">
         <div class="panel">
@@ -80,6 +91,19 @@
         </div>
       </div>
 
+      <!-- Rank Mode Game Over -->
+      <div id="rankGameOver" class="overlay" style="display: none;">
+        <div class="panel">
+          <h2 id="rankGameOverTitle">💎 Rank Mode Complete!</h2>
+          <p id="rankGameOverStats"></p>
+          <p id="rankGameOverRank" style="margin-top: 12px; font-size: 16px; color: #7bed9f; font-weight: bold;"></p>
+          <p id="rankGameOverPersonal" style="margin-top: 8px; font-size: 14px; color: #eccc68;"></p>
+          <button id="btnRankRetry" class="danger">Play Again</button>
+          <button id="btnRankMap">Menu</button>
+          <button id="btnRankLeaderboard" class="secondary">Leaderboard</button>
+        </div>
+      </div>
+
       <!-- Leaderboard Modal -->
       <div id="leaderboardModal" class="overlay" style="display: none;">
         <div class="panel">
@@ -87,10 +111,6 @@
           <div class="lb-username-display" id="lbUsernameDisplay">
             <div class="name" id="lbName">—</div>
             <div class="rank" id="lbRank">Log in to see your rank</div>
-          </div>
-          <div class="lb-tabs">
-            <button class="lb-tab active" data-tab="score">Top Score</button>
-            <button class="lb-tab" data-tab="correct">Most Correct</button>
           </div>
           <div class="lb-list" id="lbList">
             <div class="lb-loading">Loading...</div>
