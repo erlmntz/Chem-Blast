@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui-layer">
+      <!-- Main Menu -->
+      <div id="mainMenu" class="overlay">
+        <div class="panel">
+          <h1>Codewisp</h1>
+          <p id="loadingText">Loading...</p>
+          <button id="btnStart" style="display: none;">Play</button>
+        </div>
+      </div>
+      <!-- World Map -->
+      <div id="worldMap" class="overlay" style="display: none;">
+        <div class="panel">
+          <h2>Select Level</h2>
+          <div id="levelList"></div>
+          <button id="btnBackToMenu">Back</button>
+        </div>
+      </div>
+      <!-- HUD -->
+      <div id="hud" style="display: none;">
+        <div id="hudTop" style="width: 100%; display: flex; justify-content: space-between;">
+          <span id="hudLevel">Level 1</span>
+          <span id="hudTimer"></span>
+          <span id="hudScore">Score: 0</span>
+        </div>
+      </div>
+      <!-- Game Over -->
+      <div id="gameOver" class="overlay" style="display: none;">
+        <div class="panel">
+          <h2 id="gameOverTitle">Level Complete!</h2>
+          <p id="gameOverStats"></p>
+          <button id="btnNextLevel">Next Level</button>
+          <button id="btnMap">World Map</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="GameObject.js"></script>
+  <script src="LevelData.js"></script>
+  <script src="BackgroundGrid.js"></script>
+  <script src="Slot.js"></script>
+  <script src="Block.js"></script>
+  <script src="EquationDisplay.js"></script>
+  <script src="Particle.js"></script>
+  <script src="Game.js"></script>
+  <script>
+    const game = new Game(document.getElementById('gameCanvas'));
+    window.game = game;
+  </script>
+</body>
+</html>

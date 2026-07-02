@@ -1,0 +1,106 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+#gameContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1a2e;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#ui-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+#ui-layer > * { pointer-events: auto; }
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  background: rgba(26, 26, 46, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.panel {
+  background: #16213e;
+  padding: 40px;
+  border-radius: 20px;
+  text-align: center;
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border: 2px solid #0f3460;
+  min-width: 350px;
+}
+
+h1 { font-size: 48px; margin-bottom: 20px; color: #7bed9f; text-shadow: 0 0 10px rgba(123, 237, 159, 0.5); }
+h2 { font-size: 32px; margin-bottom: 20px; color: #70a1ff; }
+
+button {
+  background: #eccc68;
+  color: #2f3542;
+  border: none;
+  padding: 15px 30px;
+  font-size: 20px;
+  font-weight: bold;
+  border-radius: 10px;
+  cursor: pointer;
+  margin: 10px;
+  transition: transform 0.1s, background 0.2s;
+  box-shadow: 0 4px 0 #ffa502;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  background: #ffeaa7;
+}
+
+button:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 #ffa502;
+}
+
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  color: #fff;
+  font-size: 24px;
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+#levelList {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.level-btn {
+  background: #70a1ff;
+  color: #fff;
+  box-shadow: 0 4px 0 #5352ed;
+  width: 100%;
+}
+.level-btn:hover { background: #1e90ff; }
+.level-btn:disabled {
+  background: #57606f;
+  box-shadow: 0 4px 0 #2f3542;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
