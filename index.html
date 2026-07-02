@@ -2,7 +2,10 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Chem Blast</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,50 +15,108 @@
       <!-- Main Menu -->
       <div id="mainMenu" class="overlay">
         <div class="panel">
-          <h1>Codewisp</h1>
+          <h1>Chem Blast</h1>
           <p id="loadingText">Loading...</p>
           <button id="btnStart" style="display: none;">Play</button>
+          <button id="btnLeaderboard" class="secondary" style="display: none;">Leaderboard</button>
+          <div id="mainMenuAudioRow" style="display: none; margin-top: 12px;">
+            <button id="btnToggleMusic" class="small secondary" style="font-size:14px;">🎵 Music</button>
+            <button id="btnToggleSfx" class="small secondary" style="font-size:14px;">🔊 SFX</button>
+          </div>
         </div>
       </div>
-      <!-- World Map -->
-      <div id="worldMap" class="overlay" style="display: none;">
+
+      <!-- Username Modal -->
+      <div id="usernameModal" class="overlay" style="display: none;">
         <div class="panel">
-          <h2>Select Level</h2>
-          <div id="levelList"></div>
-          <button id="btnBackToMenu">Back</button>
+          <h2>Enter Your Name</h2>
+          <label for="usernameInput">Choose a username to save your scores:</label>
+          <input type="text" id="usernameInput" maxlength="20" placeholder="Player name..." autocomplete="off">
+          <div id="usernameError"></div>
+          <div class="btn-group">
+            <button id="btnUsernameSave" class="secondary">Save</button>
+            <button id="btnUsernameSkip" class="danger">Skip</button>
+          </div>
         </div>
       </div>
+
+      <!-- Difficulty Select -->
+      <div id="difficultySelect" class="overlay" style="display: none;">
+        <div class="panel">
+          <h2>Choose Difficulty</h2>
+          <div id="difficultyList"></div>
+          <button id="btnDiffBack" class="danger" style="width:100%;">Back</button>
+        </div>
+      </div>
+
+      <!-- Mode Select (after choosing difficulty) -->
+      <div id="modeSelect" class="overlay" style="display: none;">
+        <div class="panel">
+          <h2 id="modeSelectTitle">Select Mode</h2>
+          <div id="modeList"></div>
+          <button id="btnModeBack" class="danger" style="width:100%;">Back</button>
+        </div>
+      </div>
+
       <!-- HUD -->
       <div id="hud" style="display: none;">
-        <div id="hudTop" style="width: 100%; display: flex; justify-content: space-between;">
+        <div id="hudTop">
           <span id="hudLevel">Level 1</span>
           <span id="hudTimer"></span>
           <span id="hudScore">Score: 0</span>
         </div>
       </div>
+
       <!-- Game Over -->
       <div id="gameOver" class="overlay" style="display: none;">
         <div class="panel">
           <h2 id="gameOverTitle">Level Complete!</h2>
           <p id="gameOverStats"></p>
-          <button id="btnNextLevel">Next Level</button>
-          <button id="btnMap">World Map</button>
+          <p id="gameOverPersonal" style="margin-top: 8px; font-size: 14px; color: #eccc68; min-height: 20px;"></p>
+          <button id="btnRetry" class="danger">Retry</button>
+          <button id="btnNextLevel">Next Difficulty</button>
+          <button id="btnMap">Menu</button>
+          <button id="btnGameOverLeaderboard" class="secondary">Leaderboard</button>
+        </div>
+      </div>
+
+      <!-- Leaderboard Modal -->
+      <div id="leaderboardModal" class="overlay" style="display: none;">
+        <div class="panel">
+          <h2>Leaderboard</h2>
+          <div class="lb-username-display" id="lbUsernameDisplay">
+            <div class="name" id="lbName">—</div>
+            <div class="rank" id="lbRank">Log in to see your rank</div>
+          </div>
+          <div class="lb-tabs">
+            <button class="lb-tab active" data-tab="score">Top Score</button>
+            <button class="lb-tab" data-tab="correct">Most Correct</button>
+          </div>
+          <div class="lb-list" id="lbList">
+            <div class="lb-loading">Loading...</div>
+          </div>
+          <button id="btnLbClose" style="width:100%; margin-top: 12px;">Close</button>
         </div>
       </div>
     </div>
   </div>
-  
+
   <script src="GameObject.js"></script>
+  <script src="Camera.js"></script>
   <script src="LevelData.js"></script>
   <script src="BackgroundGrid.js"></script>
   <script src="Slot.js"></script>
   <script src="Block.js"></script>
   <script src="EquationDisplay.js"></script>
   <script src="Particle.js"></script>
+  <script src="AudioManager.js"></script>
+  <script src="SupabaseClient.js"></script>
   <script src="Game.js"></script>
   <script>
-    const game = new Game(document.getElementById('gameCanvas'));
-    window.game = game;
+    document.addEventListener('DOMContentLoaded', () => {
+      const game = new Game(document.getElementById('gameCanvas'));
+      window.game = game;
+    });
   </script>
 </body>
 </html>

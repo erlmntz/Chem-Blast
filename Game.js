@@ -4,115 +4,354 @@ class Game {
     this.ctx = canvas.getContext('2d');
     this.entities = [];
     this.state = 'MENU';
-    
+
     this.designWidth = 800;
     this.designHeight = 600;
-    this.cam = Camera.create(this.canvas, {
-      width: this.designWidth, height: this.designHeight,
+    this.cam = new Camera(canvas, {
+      width: this.designWidth,
+      height: this.designHeight,
       background: '#1a1a2e'
     });
-    
+
     this.lastTime = 0;
-    this.saveData = null;
-    
     this.bgGrid = new BackgroundGrid(this.designWidth, this.designHeight);
     this.entities.push(this.bgGrid);
-    
+
+    // Game state
+    this.currentLevel = null;
+    this.currentMode = 'learn';
+    this.currentDiffKey = 'easy';
+    this.score = 0;
+    this.timer = 0;
+    this.lives = 1;
+    this.correctCount = 0;
+    this.totalAttempted = 0;
+    this.equationQueue = [];
+    this.eqDisplay = null;
+    this.playerUsername = null;
+    this.scoreMultiplier = 1;
+
+    // Drag state
+    this.draggedBlock = null;
+    this.offsetX = 0;
+    this.offsetY = 0;
+
     this.setupResize();
     this.setupInput();
     this.setupUI();
-    
-    this.setupAsync();
+
+    this.bootstrap();
     this.start();
   }
-  
-  async setupAsync() {
-    try {
-      if (window.SaveData && SaveData.isAvailable()) {
-        this.saveData = await SaveData.init({
-          highScore: 0,
-          unlockedLevel: 1,
-          leaderboard: [{ field: 'highScore', label: 'Highest Score' }]
-        });
+
+  async bootstrap() {
+    document.getElementById('loadingText').textContent = 'Initializing...';
+
+    await SupabaseClient.init();
+
+    let savedName = null;
+    try { savedName = localStorage.getItem('chemblast_username'); } catch (e) { /* ignore */ }
+
+    if (savedName) {
+      try {
+        const player = await SupabaseClient.getOrCreatePlayer(savedName);
+        this.playerUsername = player.username;
+      } catch (e) {
+        console.warn('Could not restore player:', e.message);
+        localStorage.removeItem('chemblast_username');
       }
-    } catch (e) { console.error("SaveData init error:", e); }
-    
+    }
+
     document.getElementById('loadingText').style.display = 'none';
     document.getElementById('btnStart').style.display = 'inline-block';
+    document.getElementById('btnLeaderboard').style.display = 'inline-block';
+    document.getElementById('mainMenuAudioRow').style.display = 'block';
+
+    try {
+      const musicPref = localStorage.getItem('chemblast_music');
+      const sfxPref = localStorage.getItem('chemblast_sfx');
+      if (musicPref === 'off') { Audio.musicEnabled = false; Audio.musicGain.gain.value = 0; }
+      if (sfxPref === 'off') { Audio.sfxEnabled = false; }
+    } catch (e) { /* ignore */ }
+
+    if (!this.playerUsername) {
+      setTimeout(() => this.showUsernameModal(), 500);
+    } else {
+      Audio.startMusic();
+    }
   }
 
+  // ───────────── UI Setup ─────────────
+
   setupUI() {
+    // Main menu
     document.getElementById('btnStart').addEventListener('click', () => {
       document.getElementById('mainMenu').style.display = 'none';
-      this.showWorldMap();
+      this.showDifficultySelect();
     });
 
-    document.getElementById('btnBackToMenu').addEventListener('click', () => {
-      document.getElementById('worldMap').style.display = 'none';
+    document.getElementById('btnLeaderboard').addEventListener('click', () => {
+      this.showLeaderboard();
+    });
+
+    // Difficulty screen
+    document.getElementById('btnDiffBack').addEventListener('click', () => {
+      document.getElementById('difficultySelect').style.display = 'none';
       document.getElementById('mainMenu').style.display = 'flex';
     });
 
+    // Mode screen
+    document.getElementById('btnModeBack').addEventListener('click', () => {
+      document.getElementById('modeSelect').style.display = 'none';
+      document.getElementById('difficultySelect').style.display = 'flex';
+    });
+
+    // Game over
     document.getElementById('btnMap').addEventListener('click', () => {
       document.getElementById('gameOver').style.display = 'none';
-      this.showWorldMap();
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('mainMenu').style.display = 'flex';
+    });
+
+    document.getElementById('btnRetry').addEventListener('click', () => {
+      document.getElementById('gameOver').style.display = 'none';
+      document.getElementById('hud').style.display = 'none';
+      if (this.currentLevel) {
+        this.startLevel(this.currentLevel);
+      } else {
+        this.showDifficultySelect();
+      }
     });
 
     document.getElementById('btnNextLevel').addEventListener('click', () => {
       document.getElementById('gameOver').style.display = 'none';
-      const nextId = this.currentLevel.id + 1;
-      const nextLevel = LevelData_levels.find(l => l.id === nextId);
-      if (nextLevel) {
-        this.startLevel(nextLevel);
-      } else {
-        this.showWorldMap();
+      document.getElementById('hud').style.display = 'none';
+      // Move to next difficulty tier
+      const diffOrder = ['easy', 'medium', 'hard', 'super_hard'];
+      const idx = diffOrder.indexOf(this.currentDiffKey);
+      if (idx >= 0 && idx < diffOrder.length - 1) {
+        const nextDiff = diffOrder[idx + 1];
+        const level = LevelData_levels.find(
+          l => l.diffKey === nextDiff && l.modeKey === this.currentLevel.modeKey
+        );
+        if (level) {
+          this.startLevel(level);
+          return;
+        }
+      }
+      this.showDifficultySelect();
+    });
+
+    document.getElementById('btnGameOverLeaderboard').addEventListener('click', () => {
+      this.showLeaderboard();
+    });
+
+    // Leaderboard close
+    document.getElementById('btnLbClose').addEventListener('click', () => {
+      document.getElementById('leaderboardModal').style.display = 'none';
+    });
+
+    // Username modal
+    const usernameInput = document.getElementById('usernameInput');
+    usernameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.handleUsernameSave();
+    });
+
+    document.getElementById('btnUsernameSave').addEventListener('click', () => {
+      this.handleUsernameSave();
+    });
+
+    document.getElementById('btnUsernameSkip').addEventListener('click', () => {
+      this.closeUsernameModal();
+    });
+
+    // Leaderboard tab switching
+    document.querySelectorAll('.lb-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.refreshLeaderboard(tab.dataset.tab);
+      });
+    });
+
+    // Audio toggles
+    document.getElementById('btnToggleMusic').addEventListener('click', () => {
+      const on = !Audio.toggleMusic();
+      document.getElementById('btnToggleMusic').textContent = on ? '🎵 Music' : '🚫 Music';
+      localStorage.setItem('chemblast_music', on ? 'on' : 'off');
+      Audio.playClick();
+    });
+
+    document.getElementById('btnToggleSfx').addEventListener('click', () => {
+      const on = !Audio.toggleSfx();
+      document.getElementById('btnToggleSfx').textContent = on ? '🔊 SFX' : '🔇 SFX';
+      localStorage.setItem('chemblast_sfx', on ? 'on' : 'off');
+      if (on) Audio.playClick();
+    });
+
+    // Button click sounds
+    document.querySelectorAll('button').forEach(btn => {
+      if (btn.id !== 'btnToggleMusic' && btn.id !== 'btnToggleSfx') {
+        btn.addEventListener('click', () => Audio.playClick());
       }
     });
   }
 
-  showWorldMap() {
-    document.getElementById('worldMap').style.display = 'flex';
-    const list = document.getElementById('levelList');
+  // ───────────── Username ─────────────
+
+  showUsernameModal() {
+    const modal = document.getElementById('usernameModal');
+    const input = document.getElementById('usernameInput');
+    const error = document.getElementById('usernameError');
+    error.textContent = '';
+    input.value = '';
+    modal.style.display = 'flex';
+    setTimeout(() => input.focus(), 100);
+  }
+
+  closeUsernameModal() {
+    document.getElementById('usernameModal').style.display = 'none';
+  }
+
+  async handleUsernameSave() {
+    const input = document.getElementById('usernameInput');
+    const error = document.getElementById('usernameError');
+    const name = input.value.trim();
+
+    if (!name) {
+      error.textContent = 'Please enter a name or press Skip.';
+      return;
+    }
+
+    if (name.length < 2) {
+      error.textContent = 'Name must be at least 2 characters.';
+      return;
+    }
+
+    try {
+      const player = await SupabaseClient.getOrCreatePlayer(name);
+      this.playerUsername = player.username;
+      localStorage.setItem('chemblast_username', this.playerUsername);
+      this.closeUsernameModal();
+    } catch (e) {
+      error.textContent = 'Error: ' + e.message;
+    }
+  }
+
+  // ───────────── Difficulty / Mode Selection ─────────────
+
+  showDifficultySelect() {
+    document.getElementById('difficultySelect').style.display = 'flex';
+    const list = document.getElementById('difficultyList');
     list.innerHTML = '';
-    
-    const unlocked = this.saveData ? this.saveData.unlockedLevel : 1;
-    
-    for (const level of LevelData_levels) {
+
+    const diffKeys = ['easy', 'medium', 'hard', 'super_hard'];
+
+    for (const dk of diffKeys) {
+      const diff = LevelData_difficulties[dk];
       const btn = document.createElement('button');
-      btn.className = 'level-btn';
-      btn.innerText = level.name;
-      
-      if (level.id > unlocked) {
-        btn.disabled = true;
-        btn.innerText += " (Locked)";
-      } else {
-        btn.addEventListener('click', () => {
-          document.getElementById('worldMap').style.display = 'none';
-          this.startLevel(level);
-        });
-      }
+      btn.className = 'diff-btn';
+      btn.style.background = '#16213e';
+      btn.style.color = '#fff';
+
+      // Count of equations
+      const eqCount = LevelData_equations.filter(e => e.diff === dk).length;
+
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = `${diff.icon} ${diff.label}`;
+      btn.appendChild(label);
+
+      const desc = document.createElement('span');
+      desc.className = 'desc';
+      desc.textContent = `${eqCount} equations | ${diff.timeTime}s time challenge | ×${diff.scoreMultiplier} score`;
+      btn.appendChild(desc);
+
+      btn.addEventListener('click', () => {
+        document.getElementById('difficultySelect').style.display = 'none';
+        this.showModeSelect(dk);
+      });
+
       list.appendChild(btn);
     }
   }
 
+  showModeSelect(diffKey) {
+    this.currentDiffKey = diffKey;
+    const diff = LevelData_difficulties[diffKey];
+    document.getElementById('modeSelectTitle').textContent = `${diff.icon} ${diff.label} — Select Mode`;
+    document.getElementById('modeSelect').style.display = 'flex';
+    const list = document.getElementById('modeList');
+    list.innerHTML = '';
+
+    const modeKeys = ['learn', 'time', 'endless'];
+    const modeLabels = {
+      learn: { label: '📖 Learn', desc: 'No timer — practice freely', timeDisplay: '-' },
+      time: { label: '⏱ Time Challenge', desc: `Race the clock! ${diff.timeTime}s`, timeDisplay: `${diff.timeTime}s` },
+      endless: { label: '♾ Endless Survival', desc: `Don't lose all ${diff.endlessLives} lives!`, timeDisplay: `${diff.endlessLives} lives` }
+    };
+
+    for (const mk of modeKeys) {
+      const info = modeLabels[mk];
+      const level = LevelData_levels.find(l => l.diffKey === diffKey && l.modeKey === mk);
+      if (!level) continue;
+
+      const btn = document.createElement('button');
+      btn.className = 'mode-btn';
+
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = info.label;
+      btn.appendChild(label);
+
+      const desc = document.createElement('span');
+      desc.className = 'desc';
+      desc.textContent = `${info.desc} | ×${diff.scoreMultiplier} score`;
+      btn.appendChild(desc);
+
+      btn.addEventListener('click', () => {
+        document.getElementById('modeSelect').style.display = 'none';
+        this.startLevel(level);
+      });
+
+      list.appendChild(btn);
+    }
+  }
+
+  // ───────────── Level Start ─────────────
+
   startLevel(levelData) {
     this.currentLevel = levelData;
     this.currentMode = levelData.mode;
+    this.currentDiffKey = levelData.diffKey;
+    this.scoreMultiplier = levelData.scoreMultiplier;
     this.equationQueue = [...levelData.eqs];
     this.score = 0;
+    this.correctCount = 0;
+    this.totalAttempted = 0;
     this.timer = levelData.time || 0;
-    this.lives = 1;
-    
+    this.lives = levelData.lives || 1;
+
+    if (this.eqDisplay) {
+      this.eqDisplay.cleanup();
+      this.eqDisplay.destroy = true;
+      this.eqDisplay = null;
+    }
+
     document.getElementById('hud').style.display = 'flex';
-    document.getElementById('hudLevel').innerText = levelData.name;
-    document.getElementById('hudScore').innerText = `Score: 0`;
-    
+    document.getElementById('hudLevel').textContent = levelData.shortName || levelData.name;
+    document.getElementById('hudScore').textContent = 'Score: 0';
+
     this.setupTray();
     this.nextEquation();
     this.state = 'PLAYING';
   }
 
   setupTray() {
-    this.entities.forEach(e => { if (e.name === 'Block' && e.isTray) e.destroy = true; });
+    this.entities.forEach(e => {
+      if (e.name === 'Block' && e.isTray) e.destroy = true;
+    });
+
     const spacing = 70;
     const startX = this.designWidth / 2 - (4 * spacing);
     const y = this.designHeight - 80;
@@ -126,11 +365,13 @@ class Game {
     if (this.eqDisplay) {
       this.eqDisplay.cleanup();
       this.eqDisplay.destroy = true;
+      this.eqDisplay = null;
     }
+
     this.entities.forEach(e => {
       if (e.name === 'Block' && !e.isTray) e.destroy = true;
     });
-    
+
     if (this.equationQueue.length === 0) {
       if (this.currentMode === 'endless') {
         this.equationQueue = [...this.currentLevel.eqs].sort(() => Math.random() - 0.5);
@@ -139,19 +380,26 @@ class Game {
         return;
       }
     }
-    
+
     const eqId = this.equationQueue.shift();
     const eqData = LevelData_getEquation(eqId);
-    
-    this.eqDisplay = new EquationDisplay(this.designWidth / 2, this.designHeight / 2 - 50, eqData, this);
+    if (!eqData) {
+      this.nextEquation();
+      return;
+    }
+
+    this.eqDisplay = new EquationDisplay(
+      this.designWidth / 2,
+      this.designHeight / 2 - 50,
+      eqData,
+      this
+    );
     this.entities.push(this.eqDisplay);
   }
 
-  setupInput() {
-    this.draggedBlock = null;
-    this.offsetX = 0;
-    this.offsetY = 0;
+  // ───────────── Input (Desktop + Touch) ─────────────
 
+  setupInput() {
     const getPointerPos = (e) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -161,37 +409,36 @@ class Game {
     const onDown = (e) => {
       if (this.state !== 'PLAYING') return;
       const pos = getPointerPos(e);
-      
+
       const sorted = [...this.entities].sort((a, b) => (b.z || 0) - (a.z || 0));
-      
+
       for (const ent of sorted) {
-        if (ent.name === 'Block') {
-          const b = ent.getBounds();
-          if (pos.x >= b.x && pos.x <= b.x + b.width && pos.y >= b.y && pos.y <= b.y + b.height) {
-            if (ent.fizzleTimer > 0) continue;
-            
-            if (ent.isTray) {
-              const newBlock = new Block(ent.x, ent.y, ent.value, false);
-              this.entities.push(newBlock);
-              this.draggedBlock = newBlock;
-              this.offsetX = pos.x - ent.x;
-              this.offsetY = pos.y - ent.y;
-              newBlock.isDragging = true;
-              newBlock.z = 5;
-            } else {
-              this.draggedBlock = ent;
-              this.offsetX = pos.x - ent.x;
-              this.offsetY = pos.y - ent.y;
-              ent.isDragging = true;
-              ent.z = 5;
-              if (ent.slot) {
-                ent.slot.block = null;
-                ent.slot = null;
-              }
-            }
-            break;
+        if (ent.name !== 'Block') continue;
+        const b = ent.getBounds();
+        if (pos.x < b.x || pos.x > b.x + b.width || pos.y < b.y || pos.y > b.y + b.height) continue;
+        if (ent.fizzleTimer > 0) continue;
+
+        if (ent.isTray) {
+          const newBlock = new Block(ent.x, ent.y, ent.value, false);
+          this.entities.push(newBlock);
+          this.draggedBlock = newBlock;
+          this.offsetX = pos.x - ent.x;
+          this.offsetY = pos.y - ent.y;
+          newBlock.isDragging = true;
+          newBlock.z = 5;
+          Audio.playPickup();
+        } else {
+          this.draggedBlock = ent;
+          this.offsetX = pos.x - ent.x;
+          this.offsetY = pos.y - ent.y;
+          ent.isDragging = true;
+          ent.z = 5;
+          if (ent.slot) {
+            ent.slot.block = null;
+            ent.slot = null;
           }
         }
+        break;
       }
     };
 
@@ -202,35 +449,36 @@ class Game {
       this.draggedBlock.y = pos.y - this.offsetY;
     };
 
-    const onUp = (e) => {
+    const onUp = () => {
       if (!this.draggedBlock) return;
-      
+
       let droppedInSlot = false;
       for (const ent of this.entities) {
-        if (ent.name === 'Slot') {
-          const b = ent.getBounds();
-          const cx = this.draggedBlock.x + this.draggedBlock.width / 2;
-          const cy = this.draggedBlock.y + this.draggedBlock.height / 2;
-          
-          if (cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height) {
-            if (!ent.block) {
-              this.draggedBlock.x = ent.x;
-              this.draggedBlock.y = ent.y;
-              this.draggedBlock.slot = ent;
-              ent.block = this.draggedBlock;
-              droppedInSlot = true;
-              this.draggedBlock.z = 3;
-              this.checkEquation();
-            }
-            break;
+        if (ent.name !== 'Slot') continue;
+        const b = ent.getBounds();
+        const cx = this.draggedBlock.x + this.draggedBlock.width / 2;
+        const cy = this.draggedBlock.y + this.draggedBlock.height / 2;
+
+        if (cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height) {
+          if (!ent.block) {
+            this.draggedBlock.x = ent.x;
+            this.draggedBlock.y = ent.y;
+            this.draggedBlock.slot = ent;
+            ent.block = this.draggedBlock;
+            droppedInSlot = true;
+            this.draggedBlock.z = 3;
+            this.totalAttempted++;
+            Audio.playDrop();
+            this.checkEquation();
           }
+          break;
         }
       }
-      
+
       if (!droppedInSlot) {
         this.draggedBlock.destroy = true;
       }
-      
+
       this.draggedBlock.isDragging = false;
       if (this.draggedBlock && !this.draggedBlock.destroy) {
         this.draggedBlock.z = 3;
@@ -241,45 +489,62 @@ class Game {
     this.canvas.addEventListener('mousedown', onDown);
     this.canvas.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    
-    this.canvas.addEventListener('touchstart', onDown, {passive: false});
-    this.canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, {passive: false});
-    window.addEventListener('touchend', onUp);
+
+    this.canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      onDown(e);
+    }, { passive: false });
+
+    this.canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      onMove(e);
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
+      if (this.draggedBlock) onUp();
+    });
   }
+
+  // ───────────── Equation Checking ─────────────
 
   checkEquation() {
     if (!this.eqDisplay) return;
-    
+
     const slots = this.eqDisplay.slots;
     const allFilled = slots.every(s => s.block !== null);
     if (!allFilled) return;
-    
+
     const allCorrect = slots.every(s => s.block.value === s.expectedValue);
-    
+
     if (allCorrect) {
-      this.score += 100;
-      document.getElementById('hudScore').innerText = `Score: ${this.score}`;
-      
+      this.correctCount++;
+      // Apply score multiplier
+      this.score += Math.floor(100 * this.scoreMultiplier);
+      document.getElementById('hudScore').textContent = `Score: ${this.score}`;
+
       if (this.bgGrid) this.bgGrid.triggerClear();
-      this.spawnParticles(this.designWidth / 2, this.designHeight / 2, "#7bed9f");
-      
+      this.spawnParticles(this.designWidth / 2, this.designHeight / 2, '#7bed9f');
+      Audio.playCorrect();
+
       this.state = 'TRANSITION';
       setTimeout(() => {
         this.nextEquation();
         this.state = 'PLAYING';
-      }, 1000);
-      
+      }, 800);
+
     } else {
       this.cam.shake(5, 0.5);
+      Audio.playWrong();
+
       for (const s of slots) {
         if (s.block && s.block.value !== s.expectedValue) {
           s.block.fizzleTimer = 0.5;
         }
       }
-      
+
       if (this.currentMode === 'endless') {
         this.lives--;
-        document.getElementById('hudTimer').innerText = `Lives: ${this.lives}`;
+        document.getElementById('hudTimer').textContent = `❤️ ${this.lives}`;
         if (this.lives <= 0) {
           this.state = 'TRANSITION';
           setTimeout(() => { this.endGame(false); }, 600);
@@ -288,56 +553,169 @@ class Game {
     }
   }
 
+  // ───────────── Particles ─────────────
+
   spawnParticles(x, y, color) {
     for (let i = 0; i < 30; i++) {
       this.entities.push(new Particle(x, y, color));
     }
   }
 
-  endGame(win) {
+  // ───────────── Game Over ─────────────
+
+  async endGame(win) {
     this.state = 'GAMEOVER';
     document.getElementById('hud').style.display = 'none';
     document.getElementById('gameOver').style.display = 'flex';
-    
+
     const title = document.getElementById('gameOverTitle');
     const stats = document.getElementById('gameOverStats');
-    
+    const personal = document.getElementById('gameOverPersonal');
+
+    let statsText = `Score: ${this.score} | Correct: ${this.correctCount}/${this.totalAttempted}`;
+    if (this.currentMode === 'time' && this.timer > 0) {
+      statsText += ` | Time left: ${Math.ceil(this.timer)}s`;
+    }
+
     if (win) {
-      title.innerText = "Level Complete!";
-      stats.innerText = `Final Score: ${this.score}`;
+      title.textContent = '🎉 Level Complete!';
+      stats.textContent = statsText;
       document.getElementById('btnNextLevel').style.display = 'inline-block';
+      Audio.playLevelComplete();
     } else {
-      title.innerText = "Game Over!";
-      stats.innerText = `Final Score: ${this.score}`;
+      title.textContent = '💀 Game Over!';
+      stats.textContent = statsText;
       document.getElementById('btnNextLevel').style.display = 'none';
+      Audio.playGameOver();
     }
 
-    if (this.saveData) {
-      if (this.score > this.saveData.highScore) {
-        this.saveData.highScore = this.score;
+    // Save score
+    personal.textContent = '';
+    if (this.playerUsername && this.currentLevel && this.score > 0) {
+      try {
+        const isPB = await SupabaseClient.isNewPersonalBest(this.score, this.currentMode);
+        await SupabaseClient.saveScore({
+          score: this.score,
+          correctCount: this.correctCount,
+          totalAttempted: this.totalAttempted,
+          levelId: this.currentLevel.id,
+          mode: this.currentMode
+        });
+        if (isPB) {
+          personal.textContent = '🏆 New personal best!';
+        }
+      } catch (e) {
+        console.warn('Failed to save score:', e.message);
       }
-      if (win && this.currentLevel.id >= this.saveData.unlockedLevel) {
-        this.saveData.unlockedLevel = this.currentLevel.id + 1;
-      }
-    }
-
-    if (window.Leaderboard && Leaderboard.isAvailable()) {
-      Leaderboard.finalize(this.score, { level: this.currentLevel.id, mode: this.currentMode }).catch(console.error);
     }
   }
+
+  // ───────────── Leaderboard ─────────────
+
+  async showLeaderboard() {
+    const modal = document.getElementById('leaderboardModal');
+    const list = document.getElementById('lbList');
+    const nameEl = document.getElementById('lbName');
+    const rankEl = document.getElementById('lbRank');
+
+    modal.style.display = 'flex';
+    list.innerHTML = '<div class="lb-loading">Loading...</div>';
+
+    if (this.playerUsername) {
+      nameEl.textContent = this.playerUsername;
+      try {
+        const rank = await SupabaseClient.getPlayerRank(this.playerUsername);
+        if (rank.scoreRank !== null) {
+          rankEl.textContent = `#${rank.scoreRank} by score, #${rank.correctRank} by correct`;
+        } else {
+          rankEl.textContent = 'No scores yet — play a game!';
+        }
+      } catch (e) {
+        rankEl.textContent = 'Could not load rank';
+      }
+    } else {
+      nameEl.textContent = '—';
+      rankEl.textContent = 'Log in to see your rank';
+    }
+
+    document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('.lb-tab[data-tab="score"]').classList.add('active');
+    await this.refreshLeaderboard('score');
+  }
+
+  async refreshLeaderboard(tab) {
+    const list = document.getElementById('lbList');
+    list.innerHTML = '<div class="lb-loading">Loading...</div>';
+
+    try {
+      let entries;
+      if (tab === 'score') {
+        entries = await SupabaseClient.getLeaderboardByScore(10);
+      } else {
+        entries = await SupabaseClient.getLeaderboardByCorrect(10);
+      }
+
+      if (!entries || entries.length === 0) {
+        list.innerHTML = '<div class="lb-empty">No scores yet. Play a game to get on the board!</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      const username = (this.playerUsername || '').toLowerCase();
+
+      for (const entry of entries) {
+        const div = document.createElement('div');
+        div.className = 'lb-entry';
+        if (entry.username.toLowerCase() === username) {
+          div.classList.add('me');
+        }
+
+        const rankNum = document.createElement('span');
+        rankNum.className = 'rank-num';
+        rankNum.textContent = `#${entry.rank}`;
+        div.appendChild(rankNum);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'lb-username';
+        nameSpan.textContent = entry.username;
+        div.appendChild(nameSpan);
+
+        const scoreSpan = document.createElement('span');
+        scoreSpan.className = 'lb-score';
+        if (tab === 'score') {
+          scoreSpan.textContent = String(entry.score);
+          const extra = document.createElement('span');
+          extra.className = 'lb-extra';
+          extra.textContent = `${entry.correct_count || 0} correct`;
+          scoreSpan.appendChild(extra);
+        } else {
+          scoreSpan.textContent = String(entry.correct_count || 0);
+          const extra = document.createElement('span');
+          extra.className = 'lb-extra';
+          extra.textContent = `Score: ${entry.score}`;
+          scoreSpan.appendChild(extra);
+        }
+        div.appendChild(scoreSpan);
+
+        list.appendChild(div);
+      }
+    } catch (e) {
+      list.innerHTML = `<div class="lb-empty">Error loading leaderboard: ${e.message}</div>`;
+    }
+  }
+
+  // ───────────── Resize ─────────────
 
   setupResize() {
-    const fit = () => {
-      const dpr = window.devicePixelRatio || 1;
-      const r = this.canvas.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return;
-      this.canvas.width  = Math.floor(r.width  * dpr);
-      this.canvas.height = Math.floor(r.height * dpr);
-    };
+    const fit = () => { this.cam.resize(); };
     window.addEventListener('resize', fit);
-    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(this.canvas);
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(fit).observe(this.canvas);
+    }
     fit();
   }
+
+  // ───────────── Game Loop ─────────────
 
   update(dt) {
     if (this.state === 'PLAYING') {
@@ -347,29 +725,31 @@ class Game {
           this.timer = 0;
           this.endGame(false);
         }
-        document.getElementById('hudTimer').innerText = `Time: ${Math.ceil(this.timer)}s`;
+        document.getElementById('hudTimer').textContent = `⏱ ${Math.ceil(this.timer)}s`;
       } else if (this.currentMode === 'endless') {
-        document.getElementById('hudTimer').innerText = `Lives: ${this.lives}`;
+        document.getElementById('hudTimer').textContent = `❤️ ${this.lives}`;
       } else {
-        document.getElementById('hudTimer').innerText = `Learn Mode`;
+        document.getElementById('hudTimer').textContent = '📖 Learn';
       }
     }
+
+    this.cam.update(dt);
 
     for (const entity of this.entities) {
       if (entity.update) entity.update(dt);
     }
-    
+
     this.entities = this.entities.filter(e => !e.destroy);
   }
 
   draw() {
     this.cam.begin(this.ctx);
-    
+
     const sorted = [...this.entities].sort((a, b) => (a.z || 0) - (b.z || 0));
     for (const entity of sorted) {
       if (entity.draw) entity.draw(this.ctx);
     }
-    
+
     this.cam.end(this.ctx);
   }
 

@@ -1,5 +1,12 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+body, html { 
+  width: 100%; height: 100%; overflow: hidden; background: #000; 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
 
 #gameContainer {
   position: relative;
@@ -13,6 +20,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 #ui-layer {
@@ -30,65 +38,97 @@ body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font
   align-items: center;
   justify-content: center;
   z-index: 100;
-  background: rgba(26, 26, 46, 0.8);
+  background: rgba(26, 26, 46, 0.85);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  overflow-y: auto;
+  padding: 16px;
 }
 
 .panel {
   background: #16213e;
-  padding: 40px;
-  border-radius: 20px;
+  padding: clamp(16px, 5vw, 40px);
+  border-radius: clamp(12px, 3vw, 20px);
   text-align: center;
   color: #fff;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   border: 2px solid #0f3460;
-  min-width: 350px;
+  min-width: 0;
+  width: min(90vw, 400px);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
-h1 { font-size: 48px; margin-bottom: 20px; color: #7bed9f; text-shadow: 0 0 10px rgba(123, 237, 159, 0.5); }
-h2 { font-size: 32px; margin-bottom: 20px; color: #70a1ff; }
+h1 { 
+  font-size: clamp(28px, 8vw, 48px); 
+  margin-bottom: clamp(10px, 3vw, 20px); 
+  color: #7bed9f; 
+  text-shadow: 0 0 10px rgba(123, 237, 159, 0.5); 
+}
+h2 { 
+  font-size: clamp(22px, 6vw, 32px); 
+  margin-bottom: clamp(10px, 3vw, 20px); 
+  color: #70a1ff; 
+}
 
 button {
   background: #eccc68;
   color: #2f3542;
   border: none;
-  padding: 15px 30px;
-  font-size: 20px;
+  padding: clamp(10px, 3vw, 15px) clamp(20px, 5vw, 30px);
+  font-size: clamp(16px, 4vw, 20px);
   font-weight: bold;
   border-radius: 10px;
   cursor: pointer;
-  margin: 10px;
+  margin: 8px;
   transition: transform 0.1s, background 0.2s;
   box-shadow: 0 4px 0 #ffa502;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-button:hover {
-  transform: translateY(-2px);
-  background: #ffeaa7;
-}
+button:hover { transform: translateY(-2px); background: #ffeaa7; }
+button:active { transform: translateY(2px); box-shadow: 0 0 0 #ffa502; }
 
-button:active {
-  transform: translateY(2px);
-  box-shadow: 0 0 0 #ffa502;
+button.secondary {
+  background: #70a1ff;
+  box-shadow: 0 4px 0 #5352ed;
 }
+button.secondary:hover { background: #1e90ff; }
+button.secondary:active { box-shadow: none; }
+
+button.danger {
+  background: #ff6b6b;
+  box-shadow: 0 4px 0 #c0392b;
+}
+button.danger:hover { background: #ee5a24; }
 
 #hud {
   position: absolute;
   top: 0; left: 0; right: 0;
-  padding: 20px;
+  padding: clamp(8px, 2vw, 20px);
   display: flex;
   justify-content: space-between;
   color: #fff;
-  font-size: 24px;
+  font-size: clamp(14px, 3vw, 24px);
   font-weight: bold;
   text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+
+#hudTop {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 #levelList {
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  margin-bottom: 25px;
+  gap: clamp(8px, 2vw, 15px);
+  margin-bottom: clamp(15px, 4vw, 25px);
 }
 
 .level-btn {
@@ -96,6 +136,9 @@ button:active {
   color: #fff;
   box-shadow: 0 4px 0 #5352ed;
   width: 100%;
+  padding: clamp(12px, 3vw, 16px);
+  text-align: left;
+  font-size: clamp(14px, 3.5vw, 18px);
 }
 .level-btn:hover { background: #1e90ff; }
 .level-btn:disabled {
@@ -103,4 +146,169 @@ button:active {
   box-shadow: 0 4px 0 #2f3542;
   cursor: not-allowed;
   opacity: 0.6;
+}
+.level-btn:disabled:active { transform: none; box-shadow: 0 4px 0 #2f3542; }
+.level-btn .label { display: block; }
+.level-btn .desc { display: block; font-size: 0.8em; opacity: 0.7; font-weight: normal; margin-top: 2px; }
+
+/* ---- Username Modal ---- */
+#usernameModal .panel { text-align: left; }
+#usernameModal label { 
+  display: block; 
+  color: #aaa; 
+  margin-bottom: 8px; 
+  font-size: clamp(13px, 3vw, 16px);
+}
+#usernameModal input {
+  width: 100%;
+  padding: clamp(10px, 2.5vw, 14px);
+  font-size: clamp(16px, 3.5vw, 20px);
+  background: #0f3460;
+  border: 2px solid #1e90ff;
+  border-radius: 8px;
+  color: #fff;
+  outline: none;
+  margin-bottom: 12px;
+}
+#usernameModal input:focus { border-color: #7bed9f; }
+#usernameError { color: #ff6b6b; font-size: 14px; margin-bottom: 8px; min-height: 20px; }
+#usernameModal .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+#usernameModal .btn-group button { flex: 1; min-width: 100px; }
+
+/* ---- Leaderboard ---- */
+#leaderboardModal .panel { text-align: left; }
+.lb-username-display { 
+  text-align: center; 
+  margin-bottom: 16px; 
+  padding: 12px;
+  background: rgba(112, 161, 255, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(112, 161, 255, 0.3);
+}
+.lb-username-display .name { 
+  font-size: clamp(18px, 4vw, 24px); 
+  font-weight: bold; 
+  color: #7bed9f; 
+}
+.lb-username-display .rank { 
+  font-size: clamp(13px, 3vw, 15px); 
+  color: #aaa; 
+  margin-top: 4px; 
+}
+.lb-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.lb-tab {
+  flex: 1;
+  padding: clamp(8px, 2vw, 12px);
+  border: none;
+  border-radius: 8px 8px 0 0;
+  font-size: clamp(13px, 3vw, 15px);
+  font-weight: bold;
+  cursor: pointer;
+  background: #0f3460;
+  color: #aaa;
+  transition: background 0.2s, color 0.2s;
+  box-shadow: none;
+  margin: 0;
+}
+.lb-tab:hover { background: #1a4a7a; color: #fff; }
+.lb-tab.active { background: #1e90ff; color: #fff; }
+.lb-tab:active { transform: none; box-shadow: none; }
+
+.lb-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  background: #0f3460;
+  border-radius: 0 0 10px 10px;
+}
+.lb-entry {
+  display: flex;
+  align-items: center;
+  padding: clamp(6px, 1.5vw, 10px) clamp(10px, 2.5vw, 14px);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.lb-entry:last-child { border-bottom: none; }
+.lb-entry .rank-num {
+  width: 28px;
+  font-weight: bold;
+  color: #eccc68;
+  font-size: clamp(13px, 3vw, 16px);
+}
+.lb-entry .lb-username { flex: 1; font-size: clamp(13px, 3vw, 16px); }
+.lb-entry .lb-score { 
+  font-weight: bold; 
+  color: #7bed9f; 
+  font-size: clamp(13px, 3vw, 16px);
+  text-align: right;
+}
+.lb-entry .lb-extra {
+  display: block;
+  font-size: 0.75em;
+  color: #aaa;
+  font-weight: normal;
+}
+.lb-entry.me {
+  background: rgba(123, 237, 159, 0.1);
+  border-left: 3px solid #7bed9f;
+}
+.lb-empty {
+  padding: clamp(20px, 5vw, 40px);
+  text-align: center;
+  color: #888;
+  font-size: clamp(14px, 3vw, 16px);
+}
+.lb-loading {
+  padding: clamp(20px, 5vw, 40px);
+  text-align: center;
+  color: #888;
+}
+
+/* ---- Scrollbar styling ---- */
+.lb-list::-webkit-scrollbar { width: 4px; }
+.lb-list::-webkit-scrollbar-track { background: transparent; }
+.lb-list::-webkit-scrollbar-thumb { background: #1e90ff; border-radius: 2px; }
+
+/* ---- Responsive tweaks ---- */
+@media (max-width: 480px) {
+  .panel { width: 95vw; min-width: 0; }
+  .lb-entry { padding: 8px 10px; }
+  .level-btn { padding: 10px 14px; }
+}
+
+/* ---- Difficulty / Mode Selectors ---- */
+.diff-btn, .mode-btn {
+  width: 100%;
+  padding: clamp(14px, 3vw, 20px);
+  margin: 8px 0;
+  text-align: left;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: transform 0.1s, border-color 0.2s;
+}
+.diff-btn:active, .mode-btn:active { transform: scale(0.97); }
+.diff-btn .label { display: block; font-size: clamp(16px, 4vw, 20px); font-weight: bold; }
+.diff-btn .desc { display: block; font-size: 0.8em; opacity: 0.85; font-weight: normal; margin-top: 4px; }
+
+.mode-btn { background: #16213e; color: #fff; }
+.mode-btn .label { display: block; font-size: clamp(15px, 3.5vw, 18px); font-weight: bold; }
+.mode-btn .desc { display: block; font-size: 0.8em; opacity: 0.7; font-weight: normal; margin-top: 2px; }
+
+.mode-btn:hover { border-color: #70a1ff; background: #1a2a4a; }
+.mode-btn:active { background: #0f3460; }
+
+#modeList { margin-bottom: 16px; }
+
+/* Small buttons for audio row */
+button.small {
+  padding: clamp(6px, 2vw, 10px) clamp(12px, 3vw, 18px);
+  font-size: clamp(13px, 3vw, 16px);
+  margin: 4px;
+}
+
+@media (max-height: 500px) {
+  .overlay { align-items: flex-start; padding-top: 20px; }
+  .panel { max-height: 85vh; }
 }
