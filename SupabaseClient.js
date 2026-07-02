@@ -208,7 +208,7 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
       // Deduplicate: keep best score per player
       const best = new Map();
       for (const s of raw) {
-        if (!best.has(s.username) || s.score > best.get(s.score)) {
+        if (!best.has(s.username) || s.score > best.get(s.username).score) {
           best.set(s.username, s);
         }
       }
@@ -252,7 +252,7 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
 
       const best = new Map();
       for (const s of raw) {
-        if (!best.has(s.username) || s.correct_count > best.get(s.correct_count)) {
+        if (!best.has(s.username) || s.correct_count > best.get(s.username).correct_count) {
           best.set(s.username, s);
         }
       }
