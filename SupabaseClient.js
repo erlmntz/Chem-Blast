@@ -16,12 +16,14 @@ const SupabaseClient = {
   _currentPlayer: null, // { id, username }
   _initialized: false,
 
-  /** SQL to run in Supabase SQL Editor */
+  /** SQL to run in Supabase SQL Editor (includes grade & section) */
   SCHEMA_SQL: `
 -- Players table
 CREATE TABLE IF NOT EXISTS public.players (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
+  grade TEXT,
+  section TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -111,8 +113,8 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
     }
   },
 
-  /** Get or create a player by username */
-  async getOrCreatePlayer(username) {
+  /** Get or create a player by username, grade, section */
+  async getOrCreatePlayer(username, grade = '', section = '') {
     const trimmed = username.trim();
     if (!trimmed) throw new Error('Username is required');
 
@@ -120,8 +122,12 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
       const players = this._localData.players;
       let player = players.find(p => p.username.toLowerCase() === trimmed.toLowerCase());
       if (!player) {
-        player = { id: 'local_' + Date.now(), username: trimmed, created_at: new Date().toISOString() };
+        player = { id: 'local_' + Date.now(), username: trimmed, grade, section, created_at: new Date().toISOString() };
         players.push(player);
+      } else {
+        // update grade/section if provided
+        if (grade) player.grade = grade;
+        if (section) player.section = section;
       }
       this._currentPlayer = player;
       this._saveLocal();
@@ -131,11 +137,22 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
     // Try to find existing player
     const { data: existing } = await this._client
       .from('players')
-      .select('id, username, created_at')
+      .select('id, username, grade, section, created_at')
       .ilike('username', trimmed)
       .maybeSingle();
 
     if (existing) {
+      // Update grade/section if new values provided and fields are empty
+      if ((grade || section) && (!existing.grade || !existing.section)) {
+        const updates = {};
+        if (grade && !existing.grade) updates.grade = grade;
+        if (section && !existing.section) updates.section = section;
+        if (Object.keys(updates).length) {
+          await this._client.from('players').update(updates).eq('id', existing.id);
+          existing.grade = updates.grade || existing.grade;
+          existing.section = updates.section || existing.section;
+        }
+      }
       this._currentPlayer = existing;
       return existing;
     }
@@ -143,8 +160,8 @@ CREATE POLICY "Allow public insert scores" ON public.scores FOR INSERT WITH CHEC
     // Create new player
     const { data: newPlayer, error } = await this._client
       .from('players')
-      .insert({ username: trimmed })
-      .select('id, username, created_at')
+      .insert({ username: trimmed, grade, section })
+      .select('id, username, grade, section, created_at')
       .single();
 
     if (error) throw error;

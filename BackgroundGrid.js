@@ -6,19 +6,20 @@ class BackgroundGrid extends GameObject {
     this.cellSize = 80;
     this.cols = Math.ceil(width / this.cellSize);
     this.rows = Math.ceil(height / this.cellSize);
-    
     this.litRows = [];
     this.litCols = [];
     this.litTimer = 0;
+    this.time = 0;
   }
-  
+
   triggerClear() {
     this.litRows.push(Math.floor(Math.random() * this.rows));
     this.litCols.push(Math.floor(Math.random() * this.cols));
     this.litTimer = 1.0;
   }
-  
+
   update(dt) {
+    this.time += dt;
     if (this.litTimer > 0) {
       this.litTimer -= dt;
       if (this.litTimer <= 0) {
@@ -27,12 +28,13 @@ class BackgroundGrid extends GameObject {
       }
     }
   }
-  
+
   draw(ctx) {
     ctx.save();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
-    ctx.lineWidth = 2;
-    
+    const pulse = Math.sin(this.time * 0.5) * 0.02 + 0.05;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
+    ctx.lineWidth = 1.5;
+
     for (let c = 0; c <= this.cols; c++) {
       ctx.beginPath();
       ctx.moveTo(c * this.cellSize, 0);
@@ -45,11 +47,10 @@ class BackgroundGrid extends GameObject {
       ctx.lineTo(this.width, r * this.cellSize);
       ctx.stroke();
     }
-    
+
     if (this.litTimer > 0) {
-      const alpha = this.litTimer;
-      ctx.fillStyle = `rgba(123, 237, 159, ${alpha * 0.3})`;
-      
+      const alpha = this.litTimer * 0.4;
+      ctx.fillStyle = `rgba(123, 237, 159, ${alpha})`;
       for (const r of this.litRows) {
         ctx.fillRect(0, r * this.cellSize, this.width, this.cellSize);
       }
@@ -57,7 +58,6 @@ class BackgroundGrid extends GameObject {
         ctx.fillRect(c * this.cellSize, 0, this.cellSize, this.height);
       }
     }
-    
     ctx.restore();
   }
 }

@@ -11,6 +11,7 @@ class AudioManager {
     this.musicEnabled = true;
     this.sfxEnabled = true;
     this.musicOscillators = [];
+    this._musicTimer = null;
     this._initialized = false;
   }
 
@@ -148,6 +149,10 @@ class AudioManager {
 
   stopMusic() {
     this.musicPlaying = false;
+    if (this._musicTimer) {
+      clearTimeout(this._musicTimer);
+      this._musicTimer = null;
+    }
     for (const osc of this.musicOscillators) {
       try { osc.stop(); } catch (e) { /* already stopped */ }
     }
@@ -167,6 +172,9 @@ class AudioManager {
 
   _playMusicLoop() {
     if (!this.musicPlaying || !this.ctx) return;
+
+    // Reset oscillator tracking – previous notes have already stopped
+    this.musicOscillators = [];
 
     // Simple bass arpeggio loop
     const notes = [131, 165, 196, 131, 165, 196, 131, 165, 220, 165, 131, 165];
@@ -195,7 +203,7 @@ class AudioManager {
       this.musicOscillators.push(osc);
     });
 
-    // Loop
+    // Schedule next loop
     this._musicTimer = setTimeout(() => {
       this._playMusicLoop();
     }, totalLoop * 1000);

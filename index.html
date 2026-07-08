@@ -12,6 +12,15 @@
   <div id="gameContainer">
     <canvas id="gameCanvas"></canvas>
     <div id="ui-layer">
+      <!-- Error display (hidden by default) -->
+      <div id="errorDisplay" class="overlay" style="display: none; z-index: 999;">
+        <div class="panel" style="text-align: left; border-color: #ff6b6b;">
+          <h2 style="color: #ff6b6b;">⚠️ Something went wrong</h2>
+          <pre id="errorMessage" style="color: #ffd; font-size: 14px; white-space: pre-wrap; word-break: break-word; max-height: 60vh; overflow-y: auto;"></pre>
+          <button id="btnReload" onclick="location.reload()" style="margin-top: 16px;">Reload Page</button>
+        </div>
+      </div>
+
       <!-- Main Menu -->
       <div id="mainMenu" class="overlay">
         <div class="panel">
@@ -19,7 +28,8 @@
           <p id="loadingText">Loading...</p>
           <button id="btnRankMode" style="display: none;">💎 Rank Mode</button>
           <button id="btnChallenge" style="display: none;">🎮 Challenge</button>
-          <button id="btnLeaderboard" class="secondary" style="display: none;">Leaderboard</button>
+          <button id="btnHowToPlay" class="secondary" style="display: none;">❓ How to Play</button>
+          <button id="btnLeaderboard" class="secondary" style="display: none;">🏆 Leaderboard</button>
           <div id="mainMenuAudioRow" style="display: none; margin-top: 12px;">
             <button id="btnToggleMusic" class="small secondary" style="font-size:14px;">🎵 Music</button>
             <button id="btnToggleSfx" class="small secondary" style="font-size:14px;">🔊 SFX</button>
@@ -27,14 +37,44 @@
         </div>
       </div>
 
-      <!-- Username Modal -->
+      <!-- Tutorial Modal -->
+      <div id="tutorialModal" class="overlay" style="display: none;">
+        <div class="panel" style="text-align: left; max-width: 550px;">
+          <h2 style="text-align: center;">🧪 How to Play</h2>
+          <div style="font-size: clamp(14px, 3vw, 17px); line-height: 1.6; color: #ddd;">
+            <p><strong>Goal:</strong> Balance the chemical equation by placing the correct <strong>coefficients</strong> (numbers) into the empty boxes.</p>
+            <hr style="border-color: #0f3460; margin: 12px 0;">
+            <p><strong>Step-by-step example:</strong></p>
+            <p style="background: #0f3460; padding: 10px; border-radius: 8px;">
+              <span style="color: #7bed9f;">_</span> H<sub>2</sub> + <span style="color: #7bed9f;">_</span> O<sub>2</sub> → <span style="color: #7bed9f;">_</span> H<sub>2</sub>O
+            </p>
+            <ol style="padding-left: 20px; margin: 8px 0;">
+              <li>Count atoms on each side:<br> Left: H=2, O=2 &nbsp;|&nbsp; Right: H=2, O=1</li>
+              <li>To balance oxygen, put <strong>2</strong> in front of H<sub>2</sub>O:<br>
+                <span style="color: #7bed9f;">_</span> H<sub>2</sub> + <span style="color: #7bed9f;">_</span> O<sub>2</sub> → <span style="color: #7bed9f;">2</span> H<sub>2</sub>O</li>
+              <li>Now right side has H=4, O=2. Balance hydrogen by putting <strong>2</strong> in front of H<sub>2</sub>:<br>
+                <span style="color: #7bed9f;">2</span> H<sub>2</sub> + <span style="color: #7bed9f;">_</span> O<sub>2</sub> → <span style="color: #7bed9f;">2</span> H<sub>2</sub>O</li>
+              <li>Now left H=4, O=2; right H=4, O=2 → <strong>balanced!</strong><br>
+                Final: <span style="color: #7bed9f;">2</span> H<sub>2</sub> + <span style="color: #7bed9f;">1</span> O<sub>2</sub> → <span style="color: #7bed9f;">2</span> H<sub>2</sub>O</li>
+            </ol>
+            <p><strong>Drag the numbers</strong> from the tray at the bottom into the empty slots. If all slots are filled correctly, you score!</p>
+          </div>
+          <button id="btnTutorialClose" style="width:100%; margin-top: 16px;">Got it!</button>
+        </div>
+      </div>
+
+      <!-- Username Modal (with Grade & Section) -->
       <div id="usernameModal" class="overlay" style="display: none;">
-        <div class="panel">
-          <h2>Enter Your Name</h2>
-          <label for="usernameInput">Choose a username to save your scores:</label>
-          <input type="text" id="usernameInput" maxlength="20" placeholder="Player name..." autocomplete="off">
-          <div id="usernameError"></div>
-          <div class="btn-group">
+        <div class="panel" style="text-align: left;">
+          <h2 style="text-align: center;">Welcome!</h2>
+          <label for="usernameInput">Username *</label>
+          <input type="text" id="usernameInput" maxlength="20" placeholder="Your name..." autocomplete="off">
+          <label for="gradeInput" style="margin-top: 10px;">Grade (optional)</label>
+          <input type="text" id="gradeInput" maxlength="10" placeholder="e.g. 10" autocomplete="off">
+          <label for="sectionInput" style="margin-top: 10px;">Section (optional)</label>
+          <input type="text" id="sectionInput" maxlength="20" placeholder="e.g. A" autocomplete="off">
+          <div id="usernameError" style="margin-top: 6px; color: #ff6b6b; font-size: 14px;"></div>
+          <div class="btn-group" style="margin-top: 12px;">
             <button id="btnUsernameSave" class="secondary">Save</button>
             <button id="btnUsernameSkip" class="danger">Skip</button>
           </div>
@@ -59,7 +99,7 @@
         </div>
       </div>
 
-      <!-- HUD -->
+      <!-- HUD (Challenge) -->
       <div id="hud" style="display: none;">
         <div id="hudTop">
           <span id="hudLevel">Level 1</span>
@@ -68,17 +108,28 @@
         </div>
       </div>
 
-      <!-- Rank Mode HUD (with streak) -->
+      <!-- Rank Mode HUD (with opponent) -->
       <div id="rankHud" style="display: none;">
         <div id="rankHudTop">
-          <span id="rankHudMode">💎 Rank Mode</span>
+          <span id="rankHudMode">💎 Ranked 1v1</span>
           <span id="rankHudTimer">60s</span>
           <span id="rankHudScore">Score: 0</span>
           <span id="rankHudStreak" style="color: #ffff00;">Streak: 0</span>
+          <span id="rankHudOpponent" style="color: #70a1ff;">Opponent: 0 correct</span>
         </div>
       </div>
 
-      <!-- Game Over -->
+      <!-- Rank Match Waiting -->
+      <div id="rankWaiting" class="overlay" style="display: none;">
+        <div class="panel">
+          <h2>🔍 Finding Opponent...</h2>
+          <p style="color: #aaa;">Please wait while we match you with another player.</p>
+          <div class="spinner"></div>
+          <button id="btnCancelMatch" class="danger" style="margin-top: 20px;">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Game Over (Challenge) -->
       <div id="gameOver" class="overlay" style="display: none;">
         <div class="panel">
           <h2 id="gameOverTitle">Level Complete!</h2>
@@ -121,6 +172,19 @@
     </div>
   </div>
 
+  <!-- Error catcher -->
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      const display = document.getElementById('errorDisplay');
+      const msg = document.getElementById('errorMessage');
+      if (display && msg) {
+        display.style.display = 'flex';
+        msg.textContent = error ? error.stack : message;
+      }
+      return true;
+    };
+  </script>
+
   <script src="GameObject.js"></script>
   <script src="Camera.js"></script>
   <script src="LevelData.js"></script>
@@ -131,12 +195,24 @@
   <script src="Particle.js"></script>
   <script src="AudioManager.js"></script>
   <script src="SupabaseClient.js"></script>
+  <script src="MultiplayerManager.js"></script>
   <script src="Game.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const game = new Game(document.getElementById('gameCanvas'));
-      window.game = game;
+      try {
+        const game = new Game(document.getElementById('gameCanvas'));
+        window.game = game;
+      } catch (e) {
+        const display = document.getElementById('errorDisplay');
+        const msg = document.getElementById('errorMessage');
+        if (display && msg) {
+          display.style.display = 'flex';
+          msg.textContent = e.stack || e.message;
+        } else {
+          console.error(e);
+        }
+      }
     });
   </script>
 </body>
-</html>
+</html> 
