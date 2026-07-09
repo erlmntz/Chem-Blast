@@ -100,16 +100,17 @@
       </div>
 
       <!-- HUD (Challenge) -->
-      <div id="hud" style="display: none;">
+      <div id="hud" style="display: none; position: relative;">
         <div id="hudTop">
           <span id="hudLevel">Level 1</span>
           <span id="hudTimer"></span>
           <span id="hudScore">Score: 0</span>
         </div>
+        <button id="btnExitGame" class="small danger" style="position: absolute; top: 10px; right: 10px; font-size:12px; padding:2px 10px; margin:0; pointer-events: auto;">✕ Exit</button>
       </div>
 
       <!-- Rank Mode HUD (with opponent) -->
-      <div id="rankHud" style="display: none;">
+      <div id="rankHud" style="display: none; position: relative;">
         <div id="rankHudTop">
           <span id="rankHudMode">💎 Ranked 1v1</span>
           <span id="rankHudTimer">60s</span>
@@ -117,6 +118,7 @@
           <span id="rankHudStreak" style="color: #ffff00;">Streak: 0</span>
           <span id="rankHudOpponent" style="color: #70a1ff;">Opponent: 0 correct</span>
         </div>
+        <button id="btnExitRankGame" class="small danger" style="position: absolute; top: 10px; right: 10px; font-size:12px; padding:2px 10px; margin:0; pointer-events: auto;">✕ Exit</button>
       </div>
 
       <!-- Rank Match Waiting -->
@@ -215,4 +217,4 @@
     });
   </script>
 </body>
-</html> 
+</html>

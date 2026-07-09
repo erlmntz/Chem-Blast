@@ -404,6 +404,10 @@ class Game {
       document.getElementById('mainMenu').style.display = 'flex';
     });
 
+    // ── Exit Game buttons ──
+    document.getElementById('btnExitGame').addEventListener('click', () => this.exitGame());
+    document.getElementById('btnExitRankGame').addEventListener('click', () => this.exitGame());
+
     document.querySelectorAll('button').forEach(btn => {
       if (btn.id !== 'btnToggleMusic' && btn.id !== 'btnToggleSfx') {
         btn.addEventListener('click', () => Audio.playClick());
@@ -859,6 +863,39 @@ class Game {
       }
     }
     this._clearSavedState();
+  }
+
+  // ─── Exit Game ───
+  exitGame() {
+    // Only allow exit if we're actually playing or in transition
+    if (this.state !== 'PLAYING' && this.state !== 'TRANSITION') return;
+    if (!confirm('Are you sure you want to exit the current game? Progress will be lost.')) return;
+
+    // Clean up rank mode if active
+    if (this.gameType === 'rank') {
+      this.mp.leaveMatch();
+      this._matchActive = false;
+    } else if (this.gameType === 'challenge') {
+      this._clearSavedState();
+    }
+
+    // Remove game entities (keep background grid)
+    this.entities = this.entities.filter(e => e.name === 'BackgroundGrid');
+    if (this.eqDisplay) {
+      this.eqDisplay.cleanup();
+      this.eqDisplay.destroy = true;
+      this.eqDisplay = null;
+    }
+
+    // Hide HUDs and show main menu
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('rankHud').style.display = 'none';
+    document.getElementById('mainMenu').style.display = 'flex';
+
+    // Reset game state
+    this.state = 'MENU';
+    this.draggedBlock = null;
+    this.gameType = 'challenge'; // default
   }
 
   // ─── Leaderboard ───
